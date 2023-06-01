@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ru">
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link href="https://fonts.googleapis.com/css?family=Ubuntu:300,400,700&amp;subset=cyrillic" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,700&amp;subset=cyrillic" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css?family=Roboto:300,400,700&amp;subset=cyrillic" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css?family=Playfair+Display:400,400i|Tinos:400,400i&amp;subset=cyrillic" rel="stylesheet">
+		<script type="text/javascript" src="/shared/3rdparty/jquery/jquery.js" language="javascript1.1"></script>
+		<script src="index.js"></script>
+<style>
+* { box-sizing: border-box; }
+body, html { height: 100%; }
+body { background-color: #000000; color: #ffffff; }
+h1 { font-family: "Playfair Display"; font-size: 30px; padding: 10px 0px; margin: 0px; }
+.field-box { border: 2px solid #d0d0d0; float: left; }
+.field {display: grid; grid-template-columns: repeat(40, 50px); grid-template-rows: repeat(24, 50px); position: relative; width: auto; height: auto; }
+.field .tile { position: absolute; width: 50px; height: 50px; background-size: 100%; background-image: url(images/tile-.png); z-index: 5; }
+.field .tileW { background-image: url(images/tile-W.png); }
+.field .tileE { background-image: url(images/tile-E.png); z-index: 10; }
+.field .tileP { background-image: url(images/tile-P.png); z-index: 10; }
+.field .tileHP { background-image: url(images/tile-HP.png); z-index: 9; }
+.field .tileSW { background-image: url(images/tile-SW.png); z-index: 9; }
+.field .tile .health { background-color: #ff0000; z-index: 11; position: absolute; left: 0px; top: 0px; height: 3px; }
+.field .tileP .health { background-color: #00ff00; z-index: 11; position: absolute; left: 0px; top: 0px; height: 3px; }
+.inventory-box { border: 2px solid #d0d0d0; float: left; }
+.inventory { position: relative; width: 800px; height: 32px; }
+.cl { clear: both; display: block; }
+</style>
+	</head>
+	<body>
+		<h1>Игровое поле</h1>
+		<div class="field-box">
+			<div class="field">
+			</div>
+		</div>
+		<div class="cl"></div>
+		<!--h1>Инвентарь</h1>
+		<div class="inventory-box"><div class="inventory"></div></div-->
+
+		<script>
+			// Получаем ссылку на элемент с классом "field"
+			var fieldElement = document.querySelector('.field');
+
+			var WALL_CODE = 0;
+			var FLOOR_CODE = 1;
+			var PLAYER_CODE = 2;
+			var ENEMY_CODE = 3;
+			var POTION_CODE = 4;
+			var WEAPON_CODE = 5;
+
+			var TOTAL_POTION = 10;
+			var TOTAL_WEAPON = 2;
+			var TOTAL_ENEMIES = 10;
+
+			var ENEMIES_HEALTH = 50;
+			var ENEMIES_DAMAGE = 50;
+
+			const WEAPONS = [{
+      name: "Sword",
+      damage: 15
+   },
+   {
+      name: "SwordUltra",
+      damage: 30
+   },
+];
+
+			class Player {
+   				constructor(health, weapon, coords) {
+      				this.health = health;
+      				this.weapon = weapon;
+      				this.coords = coords;
+   				}
+			}
+
+			class Enemy {
+			   	constructor(health, coords, damage) {
+      				this.health = health;
+      				this.coords = coords;
+      				this.damage = damage;
+   				}
+			}
+
+			class Game {
+				constructor() {
+      				this.map = [];
+					this.enemies = [];
+   				}
+				reset(){
+					this.enemies = [];
+   					this.map = [];
+				}
+			}
+
+			var game=new Game();
+
+
+			// Сгенерировать карту 40х24 и добавить стены
+			var COLS = 40;
+			var ROWS = 24;
+			var map = new Array(ROWS).fill(WALL_CODE);
+
+			for (let i = 0; i < ROWS; i++) {
+				map[i] = new Array(COLS).fill(WALL_CODE);
+			}
+			game.map = map;
+
+			// Генерация проходов и данжинов
+
+			generateRooms();
+			generateCorridors();
+
+			// Размещение зелий здоровья и мечей 
+
+			generateItems(TOTAL_POTION, POTION_CODE);
+			generateItems(TOTAL_WEAPON, WEAPON_CODE);
+
+			// Добавление персонажа на карту
+
+			generatePlayer();
+			
+			generateEnemies(TOTAL_ENEMIES);
+			
+			// Расскладываем map в field
+			updateField();
+
+			// Перемещения игрока
+			
+			// Обработчик событий клавиатуры
+			document.addEventListener('keydown', function(event) {
+  			// Получаем код нажатой клавиши
+  			var keyCode = event.keyCode;
+			  event.preventDefault();
+  			// Проверяем нажатую клавишу
+  			switch (keyCode) {
+    			case 87: // W
+      				movePlayer(0, -1); // Перемещаем игрока вверх
+      				break;
+    			case 83: // S
+      				movePlayer(0, 1); // Перемещаем игрока вниз
+      				break;
+    			case 65: // A
+      				movePlayer(-1, 0); // Перемещаем игрока влево
+      				break;
+    			case 68: // D
+      				movePlayer(1, 0); // Перемещаем игрока вправо
+      				break;
+				case 32: //space
+					fightNearby();
+					break;
+    			default:
+      				break;
+  			}
+			});
+
+
+			//артифишл интеллект
+			setInterval(openAI, 1000);
+
+
+			// Функция для перемещения игрока
+			function movePlayer(deltaX, deltaY) {
+  			// Вычисляем новые координаты игрока
+  				var newPosX = player.coords.x + deltaX;
+  				var newPosY = player.coords.y + deltaY;
+
+  				// Проверяем, чтобы новые координаты находились в пределах карты и были доступны для перемещения
+  				if (newPosX >= 0 && newPosX < COLS && newPosY >= 0 && newPosY < ROWS && game.map[newPosY][newPosX] === FLOOR_CODE) {
+    			// Обновляем карту, перемещая игрока
+					game.map[player.coords.y][player.coords.x] = FLOOR_CODE;
+					game.map[newPosY][newPosX] = PLAYER_CODE;
+
+    				// Обновляем позицию игрока
+    				player.coords.x = newPosX;
+    				player.coords.y = newPosY;
+
+    				// Обновляем отображение игрового поля
+    				updateField();
+  				} else if (game.map[newPosY][newPosX] === POTION_CODE) {
+				    // Обновляем карту, перемещая игрока
+					game.map[player.coords.y][player.coords.x] = FLOOR_CODE;
+					game.map[newPosY][newPosX] = PLAYER_CODE;
+					player.health += 50;
+
+    				// Обновляем позицию игрока
+    				player.coords.x = newPosX;
+    				player.coords.y = newPosY;
+					updateField();
+				} else if (game.map[newPosY][newPosX] === WEAPON_CODE) {
+					// Обновляем карту, перемещая игрока
+					game.map[player.coords.y][player.coords.x] = FLOOR_CODE;
+					game.map[newPosY][newPosX] = PLAYER_CODE;
+					player.weapon = WEAPONS[1];
+
+    				// Обновляем позицию игрока
+    				player.coords.x = newPosX;
+    				player.coords.y = newPosY;
+					updateField();
+				}
+			}
+
+			function fightNearby() {
+				console.log(game.enemies)
+				for (enemy of game.enemies) {
+					console.log(enemy)
+					if (enemy.coords.x-1 == player.coords.x && enemy.coords.y == player.coords.y || enemy.coords.x+1 == player.coords.x && enemy.coords.y == player.coords.y  || enemy.coords.y-1 == player.coords.y && enemy.coords.x == player.coords.x  || enemy.coords.y+1 == player.coords.y && enemy.coords.x == player.coords.x) {
+						// enemy.coords.x == player.coords.x && Math.abs(enemy.coords.y - player.coords.y == 1) || enemy.coords.y == player.coords.y && Math.abs(enemy.coords.x - player.coords.x
+						enemy.health -= player.weapon.damage;
+						if (enemy.health <= 0) {
+
+							var enemyIndex = game.enemies.indexOf(enemy);
+							if (enemyIndex !== -1) {
+								game.enemies.splice(enemyIndex, 1);
+							}
+
+							removeObjFromMap(enemy.coords.x,enemy.coords.y);
+							updateField();
+						}
+					}
+				}
+			}
+
+			// openAI
+			function openAI() {
+				console.log(player.health)
+				for (enemy of game.enemies){
+
+    				var directions = ['up', 'down', 'left', 'right'];
+    				var randomDirection = directions[Math.floor(Math.random() * directions.length)];
+
+    				// Получаем новые координаты врага в зависимости от выбранного направления
+    				var newCoords = { x: enemy.coords.x, y: enemy.coords.y };
+    				if (randomDirection === 'up') {
+      					newCoords.y--;
+    				} else if (randomDirection === 'down') {
+      					newCoords.y++;
+    				} else if (randomDirection === 'left') {
+      					newCoords.x--;
+    				} else if (randomDirection === 'right') {
+      					newCoords.x++;
+    				}
+
+    				// Проверяем, являются ли новые координаты доступными на карте
+    				if (newCoords.x >= 0 && newCoords.x < COLS && newCoords.y >= 0 && newCoords.y < ROWS && game.map[newCoords.y][newCoords.x] === FLOOR_CODE) {
+      					// Перемещаем врага на новые координаты
+						//game.map[enemy.coords.y][enemy.coords.x] = WALL_CODE; замуровали
+						//game.map[enemy.coords.y][enemy.coords.x] = ENEMY_CODE; не баг, а фича
+						game.map[enemy.coords.y][enemy.coords.x] = FLOOR_CODE;
+      					enemy.coords = newCoords;
+						  game.map[enemy.coords.y][enemy.coords.x] = enemy;
+						  game.map[enemy.coords.y][enemy.coords.x] = ENEMY_CODE;
+						  updateField();
+    				}
+  				
+					if (enemy.coords.x-1 == player.coords.x && enemy.coords.y == player.coords.y || enemy.coords.x+1 == player.coords.x && enemy.coords.y == player.coords.y  || enemy.coords.y-1 == player.coords.y && enemy.coords.x == player.coords.x  || enemy.coords.y+1 == player.coords.y && enemy.coords.x == player.coords.x) {
+						player.health -= enemy.damage;
+						if (player.health <= 0) {
+						removeObjFromMap(player.coords.x, player.coords.y);
+						game.reset()
+						updateField();
+					}
+					}
+				}
+			}
+
+			function updateField() {
+
+  				fieldElement.innerHTML = '';
+
+  				for (var y = 0; y < ROWS; y++) {
+    				for (var x = 0; x < COLS; x++) {
+
+      					var tileElement = document.createElement('div');
+      					tileElement.classList.add('tile');
+
+      					var tileCode = game.map[y][x];
+      					switch (tileCode) {
+        					case WALL_CODE:
+          						tileElement.classList.add('tileW');
+          						break;
+        					case FLOOR_CODE:
+          						tileElement.classList.add('tile');
+          						break;
+        					case PLAYER_CODE:
+          						tileElement.classList.add('tileP');
+          						break;
+        					case ENEMY_CODE:
+          						tileElement.classList.add('tileE');
+          						break;
+        					case POTION_CODE:
+          						tileElement.classList.add('tileHP');
+          						break;
+        					case WEAPON_CODE:
+         						tileElement.classList.add('tileSW');
+          						break;
+        					default:
+         						break;
+      					}
+
+      				tileElement.style.gridRow = (y + 1).toString();
+      				tileElement.style.gridColumn = (x + 1).toString();
+
+      				fieldElement.appendChild(tileElement);
+    				}
+  				}
+			}
+
+			function generateRooms() {
+    			var numRooms = Math.floor(Math.random() * 6) + 5; // Случайное количество комнат от 5 до 10
+    
+    			for (var i = 0; i < numRooms; i++) {
+        			var roomWidth = Math.floor(Math.random() * 6) + 3; // Случайная ширина комнаты от 3 до 8
+        			var roomHeight = Math.floor(Math.random() * 6) + 3; // Случайная высота комнаты от 3 до 8
+        			var startX = Math.floor(Math.random() * (COLS - roomWidth));
+        			var startY = Math.floor(Math.random() * (ROWS - roomHeight));
+        
+        			// Заполнение комнаты внутри карты
+        			for (var y = startY; y < startY + roomHeight; y++) {
+            			for (var x = startX; x < startX + roomWidth; x++) {
+                			game.map[y][x] = FLOOR_CODE;
+           				 }
+        			}
+    			}
+			}
+			function generateCorridors() {
+    			var numVerticalCorridors = Math.floor(Math.random() * 3) + 3; // Случайное количество вертикальных проходов от 3 до 5
+    			var numHorizontalCorridors = Math.floor(Math.random() * 3) + 3; // Случайное количество горизонтальных проходов от 3 до 5
+    
+    			for (var i = 0; i < numVerticalCorridors; i++) {
+        			var corridorX = Math.floor(Math.random() * COLS);
+        
+    				for (var y = 0; y < ROWS; y++) {
+						game.map[y][corridorX] = FLOOR_CODE;
+ 					}
+    			}
+    
+    			for (var i = 0; i < numHorizontalCorridors; i++) {
+        			var corridorY = Math.floor(Math.random() * ROWS);
+        
+        			for (var x = 0; x < COLS; x++) {
+            			game.map[corridorY][x] = FLOOR_CODE;
+        			}
+    			}	
+			}
+
+	
+			function generateValidCoords() {
+				var x, y;
+				var turns = 0,
+				limit = 100;
+
+				do {
+   					x = Math.floor(Math.random() * COLS);
+   					y = Math.floor(Math.random() * ROWS);
+   					turns++;
+				} while (game.map[y][x] != FLOOR_CODE && turns < limit);
+				return {
+   					x: x,
+   					y: y
+				};
+			}
+
+			function addObjToMap(coords, tileCode) {
+				game.map[coords.y][coords.x] = tileCode;
+			}
+			function removeObjFromMap(x, y) {
+   	
+			   game.map[y][x] = FLOOR_CODE;
+			};
+	
+			function generateItems(quantity, tileCode) {
+   				for (var i = 0; i < quantity; i++) {
+
+					var coords = generateValidCoords();
+
+      				addObjToMap(coords, tileCode);
+   				}
+			}
+
+			function generatePlayer() {
+
+				var coords = generateValidCoords();
+
+				player = new Player(100, WEAPONS[0], coords);
+
+				addObjToMap(coords, PLAYER_CODE);
+			}
+
+			function generateEnemies(amount) {
+   				for (var i = 0; i < amount; i++) {
+
+					var coords = generateValidCoords();
+
+      				var health = ENEMIES_HEALTH;
+
+      				var damage = ENEMIES_DAMAGE;
+
+      				var enemy = new Enemy(health, coords, damage);
+
+      				game.enemies.push(enemy);
+
+      				addObjToMap(coords, ENEMY_CODE);
+   				}
+			}
+		</script>
+	</body>
+</html>
